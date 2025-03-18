@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/main.dir/testAllCachePolicy.cpp.o -o main 

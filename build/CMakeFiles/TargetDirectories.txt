@@ -1,0 +1,3 @@
+/home/lqs/apue-learn/cpp-proj/KamaCache/build/CMakeFiles/main.dir
+/home/lqs/apue-learn/cpp-proj/KamaCache/build/CMakeFiles/edit_cache.dir
+/home/lqs/apue-learn/cpp-proj/KamaCache/build/CMakeFiles/rebuild_cache.dir
