@@ -1,0 +1,25 @@
+# CMake 生成目录
+build/
+CMakeFiles/
+CMakeCache.txt
+
+# CMake 生成的可执行文件和库
+*.exe
+*.out
+*.a
+*.so
+*.dylib
+*.lib
+*.dll
+
+# CMake 临时文件
+*.cmake
+Makefile
+CMakeScripts/
+
+# 其他常见生成文件
+*.ninja
+.ninja_deps
+.ninja_log
+compile_commands.json
+install_manifest.txt
