@@ -2,6 +2,8 @@
 build/
 CMakeFiles/
 CMakeCache.txt
+.cache/
+.vscode/
 
 # CMake 生成的可执行文件和库
 *.exe
