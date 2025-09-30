@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <random>
 #include <algorithm>
+#include <array>
 
 #include "KICachePolicy.h"
 #include "KLfuCache.h"
@@ -75,6 +76,8 @@ void testHotDataAccess() {
     std::mt19937 gen(rd());
     
     // 基类指针指向派生类对象，添加LFU-Aging
+    KamaCache::KICachePolicy<int, std::string>* a;
+    std::array<int,10> nn;
     std::array<KamaCache::KICachePolicy<int, std::string>*, 5> caches = {&lru, &lfu, &arc, &lruk, &lfuAging};
     std::vector<int> hits(5, 0);
     std::vector<int> get_operations(5, 0);
