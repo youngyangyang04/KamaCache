@@ -14,6 +14,17 @@ namespace KamaCache
 // 前向声明
 template<typename Key, typename Value> class KLruCache;
 
+/*
+LruNode是核心数据结构，存储缓存中最基本的数据
+key 键， value 值
+还有访问次数 accessCount
+此外还有两个指针，这个两个指针是用来构建双向量表的，分别是prev和next
+这两个指针在双向链表中的用处是，用来维护一个有序的缓存列表，有序依赖前面的访问次数。
+为了避免循环引用，这里使用了weak_ptr来代替普通的shared_ptr，因为weak_ptr不会增加对象的引用计数，它只会增加对象的弱引用计数。
+
+在接口上还提供了getkey getvalue获取键值数据，这样是为了保持封装性，保护内部数据不被随意修改。
+同时也保证了扩展性，便于未来修改内部实现而不影响外部调用。
+*/
 template<typename Key, typename Value>
 class LruNode 
 {
@@ -39,6 +50,11 @@ public:
     void incrementAccessCount() { ++accessCount_; }
 
     friend class KLruCache<Key, Value>;
+    /*
+    这里使用了友元类，KLruCache是LruNode的友元类，这样KLruCache就可以访问LruNode的私有成员变量
+    两者逻辑高度相关，可以互相访问私有变量成员
+    虽然牺牲了一定的封装性，但换来了高效率和清晰的职责划分
+    */
 };
 
 
@@ -173,9 +189,14 @@ private:
     }
 
 private:
-    int           capacity_; // 缓存容量
+    // 缓存容量， 这里规定了缓存的上限，即最大条目数，当缓存到达该容量时，触发淘汰机制
+    // 为什么这么做呢？为了防止内存无限制的增长，后续也可以更具资源调整缓存大小
+    int           capacity_; 
     NodeMap       nodeMap_; // key -> Node 
-    std::mutex    mutex_;
+    std::mutex    mutex_; // 这个是用来保证线程安全的，保证数据一致性
+    /*
+    双向链表，
+    */
     NodePtr       dummyHead_; // 虚拟头结点
     NodePtr       dummyTail_;
 };
