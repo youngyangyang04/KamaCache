@@ -34,7 +34,7 @@ public:
     // 提供必要的访问器
     Key getKey() const { return key_; }
     Value getValue() const { return value_; }
-    void setValue(const Value& value) { value_ = value; }
+    void setValue(const Value& value) { value_ = value; }  
     size_t getAccessCount() const { return accessCount_; }
     void incrementAccessCount() { ++accessCount_; }
 
@@ -51,7 +51,7 @@ public:
     using NodeMap = std::unordered_map<Key, NodePtr>;
 
     KLruCache(int capacity)
-        : capacity_(capacity)
+        : capacity_(capacity)   //将参数 capacity 的值赋给类的成员变量 capacity_
     {
         initializeList();
     }
@@ -64,7 +64,8 @@ public:
         if (capacity_ <= 0)
             return;
     
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::lock_guard<std::mutex> lock(mutex_);   //std::mutex：互斥量（互斥锁）,lock_guard:构造时加锁，离开作用域解锁
+                                                    //std::lock_guard<std::mutex> lock(mutex_);
         auto it = nodeMap_.find(key);
         if (it != nodeMap_.end())
         {
@@ -113,6 +114,7 @@ private:
     void initializeList()
     {
         // 创建首尾虚拟节点
+        //dummyHead<-最旧<-...<-最新<-dummyTail
         dummyHead_ = std::make_shared<LruNodeType>(Key(), Value());
         dummyTail_ = std::make_shared<LruNodeType>(Key(), Value());
         dummyHead_->next_ = dummyTail_;
@@ -121,13 +123,13 @@ private:
 
     void updateExistingNode(NodePtr node, const Value& value) 
     {
-        node->setValue(value);
+        node->setValue(value); //注意这里的node是指针NodePtr，而不是node实例本身，所以用->
         moveToMostRecent(node);
     }
 
     void addNewNode(const Key& key, const Value& value) 
     {
-       if (nodeMap_.size() >= capacity_) 
+       if (nodeMap_.size() >= capacity_) //缓存空间满则删除最左侧数据
        {
            evictLeastRecent();
        }
@@ -146,10 +148,10 @@ private:
 
     void removeNode(NodePtr node) 
     {
-        if(!node->prev_.expired() && node->next_) 
+        if(!node->prev_.expired() && node->next_)  
         {
             auto prev = node->prev_.lock(); // 使用lock()获取shared_ptr
-            prev->next_ = node->next_;
+            prev->next_ = node->next_;  //prev是上一个结点，node是当前结点，_是当前结点的指针
             node->next_->prev_ = prev;
             node->next_ = nullptr; // 清空next_指针，彻底断开节点与链表的连接
         }
@@ -266,6 +268,7 @@ public:
     }
 
 private:
+    //这里的get和put需要加锁，否则多线程同时写historyValueMap_会崩溃
     int                                     k_; // 进入缓存队列的评判标准
     std::unique_ptr<KLruCache<Key, size_t>> historyList_; // 访问数据历史记录(value为访问次数)
     std::unordered_map<Key, Value>          historyValueMap_; // 存储未达到k次访问的数据值
@@ -276,9 +279,9 @@ template<typename Key, typename Value>
 class KHashLruCaches
 {
 public:
-    KHashLruCaches(size_t capacity, int sliceNum)
+    KHashLruCaches(size_t capacity, int sliceNum)   
         : capacity_(capacity)
-        , sliceNum_(sliceNum > 0 ? sliceNum : std::thread::hardware_concurrency())
+        , sliceNum_(sliceNum > 0 ? sliceNum : std::thread::hardware_concurrency())//如果用户传了合法的sliceNum就使用，否则默用CPU的核心数
     {
         size_t sliceSize = std::ceil(capacity / static_cast<double>(sliceNum_)); // 获取每个分片的大小
         for (int i = 0; i < sliceNum_; ++i)
@@ -303,12 +306,12 @@ public:
 
     Value get(Key key)
     {
-        Value value;
-        memset(&value, 0, sizeof(value));
+        Value value{};//值初始化，memset 是按字节清零，会破坏 std::string、vector 等复杂对象的内部结构
+        //memset(&value, 0, sizeof(value));
         get(key, value);
         return value;
     }
-
+    
 private:
     // 将key转换为对应hash值
     size_t Hash(Key key)

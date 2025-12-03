@@ -52,7 +52,7 @@ public:
       return head_->next == tail_;
     }
 
-    // 提那家结点管理方法
+    // 添加结点管理方法
     void addNode(NodePtr node) 
     {
         if (!node || !head_ || !tail_) 
@@ -88,7 +88,7 @@ class KLfuCache : public KICachePolicy<Key, Value>
 public:
     using Node = typename FreqList<Key, Value>::Node;
     using NodePtr = std::shared_ptr<Node>;
-    using NodeMap = std::unordered_map<Key, NodePtr>;
+    using NodeMap = std::unordered_map<Key, NodePtr>;//这三行套了个娃
 
     KLfuCache(int capacity, int maxAverageNum = 1000000)
     : capacity_(capacity), minFreq_(INT8_MAX), maxAverageNum_(maxAverageNum),
@@ -106,7 +106,7 @@ public:
         auto it = nodeMap_.find(key);
         if (it != nodeMap_.end())
         {
-            // 重置其value值
+            // 重置其value值，因为是put，value可能更新了
             it->second->value = value;
             // 找到了直接调整就好了，不用再去get中再找一遍，但其实影响不大
             getInternal(it->second, value);
@@ -132,7 +132,7 @@ public:
 
     Value get(Key key) override
     {
-      Value value;
+      Value value{};//防止出错还是需要初始化
       get(key, value);
       return value;
     }
@@ -141,7 +141,7 @@ public:
     void purge()
     {
       nodeMap_.clear();
-      freqToFreqList_.clear();
+      //freqToFreqList_.clear();
     }
 
 private:
@@ -166,7 +166,8 @@ private:
     int                                            curTotalNum_; // 当前访问所有缓存次数总数 
     std::mutex                                     mutex_; // 互斥锁
     NodeMap                                        nodeMap_; // key 到 缓存节点的映射
-    std::unordered_map<int, FreqList<Key, Value>*> freqToFreqList_;// 访问频次到该频次链表的映射
+    std::unordered_map<int,std::unique_ptr<FreqList<Key, Value>>> freqToFreqList_;//改成智能指针，方便内存管理
+    //std::unordered_map<int, FreqList<Key, Value>*> freqToFreqList_;// 访问频次到该频次链表的映射
 };
 
 template<typename Key, typename Value>
@@ -238,7 +239,8 @@ void KLfuCache<Key, Value>::addToFreqList(NodePtr node)
     if (freqToFreqList_.find(node->freq) == freqToFreqList_.end())
     {
         // 不存在则创建
-        freqToFreqList_[node->freq] = new FreqList<Key, Value>(node->freq);
+        //改成智能指针就不用new了
+        freqToFreqList_[node->freq] = std::unique_ptr<FreqList<Key, Value>>(node->freq);
     }
 
     freqToFreqList_[freq]->addNode(node);
@@ -271,7 +273,7 @@ void KLfuCache<Key, Value>::decreaseFreqNum(int num)
 }
 
 template<typename Key, typename Value>
-void KLfuCache<Key, Value>::handleOverMaxAverageNum()
+void KLfuCache<Key, Value>::handleOverMaxAverageNum()//定期给所有频率打折，防止历史包袱
 {
     if (nodeMap_.empty())
         return;
@@ -290,7 +292,7 @@ void KLfuCache<Key, Value>::handleOverMaxAverageNum()
 
         // 减少频率
         node->freq -= maxAverageNum_ / 2;
-        if (node->freq < 1) node->freq = 1;
+        if (node->freq < 1) node->freq = 1;//防止freq<1，保证新节点的竞争力
 
         // 添加到新的频率列表
         addToFreqList(node);
@@ -303,10 +305,10 @@ void KLfuCache<Key, Value>::handleOverMaxAverageNum()
 template<typename Key, typename Value>
 void KLfuCache<Key, Value>::updateMinFreq() 
 {
-    minFreq_ = INT8_MAX;
+    minFreq_ = INT8_MAX;//INT8_MAX太小
     for (const auto& pair : freqToFreqList_) 
     {
-        if (pair.second && !pair.second->isEmpty()) 
+        if (pair.second && !pair.second->isEmpty()) //指针非空且链表非空
         {
             minFreq_ = std::min(minFreq_, pair.first);
         }
