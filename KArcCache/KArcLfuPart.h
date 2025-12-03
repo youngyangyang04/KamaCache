@@ -47,7 +47,7 @@ public:
         if (it != mainCache_.end()) 
         {
             updateNodeFrequency(it->second);
-            value = it->second->getValue();
+            value = it->second->getValue();//根据key获取value
             return true;
         }
         return false;
