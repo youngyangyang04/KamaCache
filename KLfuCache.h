@@ -289,8 +289,16 @@ void KLfuCache<Key, Value>::handleOverMaxAverageNum()
         removeFromFreqList(node);
 
         // 减少频率
-        node->freq -= maxAverageNum_ / 2;
-        if (node->freq < 1) node->freq = 1;
+        int oldFreq = node->freq;
+
+        int decay = maxAverageNum_ / 2;
+        node->freq -= decay;
+
+        if (node->freq < 1)
+            node->freq = 1;
+
+        int delta = node->freq - oldFreq; 
+        curTotalNum_ += delta;
 
         // 添加到新的频率列表
         addToFreqList(node);
