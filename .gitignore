@@ -1,0 +1,5 @@
+build/
+*.exe
+*.o
+*.out
+.vscode/tasks.json

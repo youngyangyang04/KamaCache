@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <thread>
@@ -26,9 +27,9 @@ private:
         std::weak_ptr<Node> pre; // 上一结点改为weak_ptr打破循环引用
         std::shared_ptr<Node> next;
 
-        Node() 
+        Node()
         : freq(1), next(nullptr) {}
-        Node(Key key, Value value) 
+        Node(const Key& key, const Value& value)
         : freq(1), key(key), value(value), next(nullptr) {}
     };
 
@@ -91,13 +92,13 @@ public:
     using NodeMap = std::unordered_map<Key, NodePtr>;
 
     KLfuCache(int capacity, int maxAverageNum = 1000000)
-    : capacity_(capacity), minFreq_(INT8_MAX), maxAverageNum_(maxAverageNum),
+    : capacity_(capacity), minFreq_(std::numeric_limits<int>::max()), maxAverageNum_(maxAverageNum),
       curAverageNum_(0), curTotalNum_(0) 
     {}
 
     ~KLfuCache() override = default;
 
-    void put(Key key, Value value) override
+    void put(const Key& key, const Value& value) override
     {
         if (capacity_ == 0)
             return;
@@ -108,8 +109,9 @@ public:
         {
             // 重置其value值
             it->second->value = value;
-            // 找到了直接调整就好了，不用再去get中再找一遍，但其实影响不大
-            getInternal(it->second, value);
+            // 更新访问频率，原value已更新无需返回
+            Value unused;
+            getInternal(it->second, unused);
             return;
         }
 
@@ -117,7 +119,7 @@ public:
     }
 
     // value值为传出参数
-    bool get(Key key, Value& value) override
+    bool get(const Key& key, Value& value) override
     {
       std::lock_guard<std::mutex> lock(mutex_);
       auto it = nodeMap_.find(key);
@@ -130,7 +132,7 @@ public:
       return false;
     }
 
-    Value get(Key key) override
+    Value get(const Key& key) override
     {
       Value value;
       get(key, value);
@@ -145,7 +147,7 @@ public:
     }
 
 private:
-    void putInternal(Key key, Value value); // 添加缓存
+    void putInternal(const Key& key, const Value& value); // 添加缓存
     void getInternal(NodePtr node, Value& value); // 获取缓存
 
     void kickOut(); // 移除缓存中的过期数据
@@ -166,7 +168,7 @@ private:
     int                                            curTotalNum_; // 当前访问所有缓存次数总数 
     std::mutex                                     mutex_; // 互斥锁
     NodeMap                                        nodeMap_; // key 到 缓存节点的映射
-    std::unordered_map<int, FreqList<Key, Value>*> freqToFreqList_;// 访问频次到该频次链表的映射
+    std::unordered_map<int, std::unique_ptr<FreqList<Key, Value>>> freqToFreqList_;// 访问频次到该频次链表的映射
 };
 
 template<typename Key, typename Value>
@@ -189,7 +191,7 @@ void KLfuCache<Key, Value>::getInternal(NodePtr node, Value& value)
 }
 
 template<typename Key, typename Value>
-void KLfuCache<Key, Value>::putInternal(Key key, Value value)
+void KLfuCache<Key, Value>::putInternal(const Key& key, const Value& value)
 {   
     // 如果不在缓存中，则需要判断缓存是否已满
     if (nodeMap_.size() == capacity_)
@@ -238,7 +240,7 @@ void KLfuCache<Key, Value>::addToFreqList(NodePtr node)
     if (freqToFreqList_.find(node->freq) == freqToFreqList_.end())
     {
         // 不存在则创建
-        freqToFreqList_[node->freq] = new FreqList<Key, Value>(node->freq);
+        freqToFreqList_[node->freq] = std::make_unique<FreqList<Key, Value>>(node->freq);
     }
 
     freqToFreqList_[freq]->addNode(node);
@@ -311,7 +313,7 @@ void KLfuCache<Key, Value>::handleOverMaxAverageNum()
 template<typename Key, typename Value>
 void KLfuCache<Key, Value>::updateMinFreq() 
 {
-    minFreq_ = INT8_MAX;
+    minFreq_ = std::numeric_limits<int>::max();
     for (const auto& pair : freqToFreqList_) 
     {
         if (pair.second && !pair.second->isEmpty()) 
@@ -319,7 +321,7 @@ void KLfuCache<Key, Value>::updateMinFreq()
             minFreq_ = std::min(minFreq_, pair.first);
         }
     }
-    if (minFreq_ == INT8_MAX) 
+    if (minFreq_ == std::numeric_limits<int>::max())
         minFreq_ = 1;
 }
 
@@ -339,21 +341,21 @@ public:
         }
     }
 
-    void put(Key key, Value value)
+    void put(const Key& key, const Value& value)
     {
         // 根据key找出对应的lfu分片
         size_t sliceIndex = Hash(key) % sliceNum_;
         lfuSliceCaches_[sliceIndex]->put(key, value);
     }
 
-    bool get(Key key, Value& value)
+    bool get(const Key& key, Value& value)
     {
         // 根据key找出对应的lfu分片
         size_t sliceIndex = Hash(key) % sliceNum_;
         return lfuSliceCaches_[sliceIndex]->get(key, value);
     }
 
-    Value get(Key key)
+    Value get(const Key& key)
     {
         Value value;
         get(key, value);
@@ -371,7 +373,7 @@ public:
 
 private:
     // 将key计算成对应哈希值
-    size_t Hash(Key key)
+    size_t Hash(const Key& key)
     {
         std::hash<Key> hashFunc;
         return hashFunc(key);

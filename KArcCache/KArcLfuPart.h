@@ -26,7 +26,7 @@ public:
         initializeLists();
     }
 
-    bool put(Key key, Value value) 
+    bool put(const Key& key, const Value& value)
     {
         if (capacity_ == 0) 
             return false;
@@ -40,7 +40,7 @@ public:
         return addNewNode(key, value);
     }
 
-    bool get(Key key, Value& value) 
+    bool get(const Key& key, Value& value)
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = mainCache_.find(key);
@@ -53,12 +53,13 @@ public:
         return false;
     }
 
-    bool contain(Key key)
+    bool contain(const Key& key)
     {
+        std::lock_guard<std::mutex> lock(mutex_);
         return mainCache_.find(key) != mainCache_.end();
     }
 
-    bool checkGhost(Key key) 
+    bool checkGhost(const Key& key)
     {
         auto it = ghostCache_.find(key);
         if (it != ghostCache_.end()) 

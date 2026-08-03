@@ -59,7 +59,7 @@ public:
     ~KLruCache() override = default;
 
     // 添加缓存
-    void put(Key key, Value value) override
+    void put(const Key& key, const Value& value) override
     {
         if (capacity_ <= 0)
             return;
@@ -76,7 +76,7 @@ public:
         addNewNode(key, value);
     }
 
-    bool get(Key key, Value& value) override
+    bool get(const Key& key, Value& value) override
     {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = nodeMap_.find(key);
@@ -89,7 +89,7 @@ public:
         return false;
     }
 
-    Value get(Key key) override
+    Value get(const Key& key) override
     {
         Value value{};
         // memset(&value, 0, sizeof(value));   // memset 是按字节设置内存的，对于复杂类型（如 string）使用 memset 可能会破坏对象的内部结构
@@ -98,7 +98,7 @@ public:
     }
 
     // 删除指定元素
-    void remove(Key key) 
+    void remove(const Key& key)
     {   
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = nodeMap_.find(key);
@@ -187,12 +187,14 @@ class KLruKCache : public KLruCache<Key, Value>
 public:
     KLruKCache(int capacity, int historyCapacity, int k)
         : KLruCache<Key, Value>(capacity) // 调用基类构造
-        , historyList_(std::make_unique<KLruCache<Key, size_t>>(historyCapacity))
         , k_(k)
+        , historyList_(std::make_unique<KLruCache<Key, size_t>>(historyCapacity))
     {}
 
-    Value get(Key key) 
+    Value get(const Key& key)
     {
+        std::lock_guard<std::mutex> lock(kMutex_);
+
         // 首先尝试从主缓存获取数据
         Value value{};
         bool inMainCache = KLruCache<Key, Value>::get(key, value);
@@ -234,8 +236,10 @@ public:
         return value;
     }
 
-    void put(Key key, Value value) 
+    void put(const Key& key, const Value& value)
     {
+        std::lock_guard<std::mutex> lock(kMutex_);
+
         // 检查是否已在主缓存
         Value existingValue{};
         bool inMainCache = KLruCache<Key, Value>::get(key, existingValue);
@@ -267,6 +271,7 @@ public:
 
 private:
     int                                     k_; // 进入缓存队列的评判标准
+    mutable std::mutex                      kMutex_; // KLruKCache 互斥锁
     std::unique_ptr<KLruCache<Key, size_t>> historyList_; // 访问数据历史记录(value为访问次数)
     std::unordered_map<Key, Value>          historyValueMap_; // 存储未达到k次访问的数据值
 };
@@ -287,31 +292,30 @@ public:
         }
     }
 
-    void put(Key key, Value value)
+    void put(const Key& key, const Value& value)
     {
         // 获取key的hash值，并计算出对应的分片索引
         size_t sliceIndex = Hash(key) % sliceNum_;
         lruSliceCaches_[sliceIndex]->put(key, value);
     }
 
-    bool get(Key key, Value& value)
+    bool get(const Key& key, Value& value)
     {
         // 获取key的hash值，并计算出对应的分片索引
         size_t sliceIndex = Hash(key) % sliceNum_;
         return lruSliceCaches_[sliceIndex]->get(key, value);
     }
 
-    Value get(Key key)
+    Value get(const Key& key)
     {
-        Value value;
-        memset(&value, 0, sizeof(value));
+        Value value{};
         get(key, value);
         return value;
     }
 
 private:
     // 将key转换为对应hash值
-    size_t Hash(Key key)
+    size_t Hash(const Key& key)
     {
         std::hash<Key> hashFunc;
         return hashFunc(key);

@@ -21,7 +21,7 @@ public:
 
     ~KArcCache() override = default;
 
-    void put(Key key, Value value) override 
+    void put(const Key& key, const Value& value) override
     {
         checkGhostCaches(key);
 
@@ -36,7 +36,7 @@ public:
         }
     }
 
-    bool get(Key key, Value& value) override 
+    bool get(const Key& key, Value& value) override
     {
         checkGhostCaches(key);
 
@@ -52,7 +52,7 @@ public:
         return lfuPart_->get(key, value);
     }
 
-    Value get(Key key) override 
+    Value get(const Key& key) override
     {
         Value value{};
         get(key, value);
@@ -60,7 +60,7 @@ public:
     }
 
 private:
-    bool checkGhostCaches(Key key) 
+    bool checkGhostCaches(const Key& key)
     {
         bool inGhost = false;
         if (lruPart_->checkGhost(key)) 
